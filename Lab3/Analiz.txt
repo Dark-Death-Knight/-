@@ -9,7 +9,7 @@ import matplotlib.pyplot as plt
 import pandas as pd
 from typing import Dict, List
 
-# Настройка логирования
+# Настройка логирования ✔️
 logging.basicConfig(
     format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
     level=logging.INFO
@@ -30,7 +30,7 @@ class TelegramBotAnalyzer:
         self.setup_database()
     
     def setup_database(self):
-        """Инициализация базы данных для хранения аналитики"""
+        """Инициализация базы данных для хранения аналитики""" ✔️
         self.conn = sqlite3.connect('bot_analytics.db', check_same_thread=False)
         cursor = self.conn.cursor()
         cursor.execute('''
@@ -52,18 +52,18 @@ class TelegramBotAnalyzer:
         self.conn.commit()
     
     def setup_handlers(self):
-        """Настройка обработчиков команд и сообщений"""
+        """Настройка обработчиков команд и сообщений""" ✔️
         # Обработчики команд
         self.application.add_handler(CommandHandler("start", self.start_command))
         self.application.add_handler(CommandHandler("help", self.help_command))
         self.application.add_handler(CommandHandler("stats", self.stats_command))
         self.application.add_handler(CommandHandler("analyze", self.analyze_command))
         
-        # Обработчики сообщений
+        # Обработчики сообщений ✔️
         self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
         self.application.add_handler(CallbackQueryHandler(self.handle_button_click))
         
-        # Обработчик ошибок
+        # Обработчик ошибок ✔️
         self.application.add_error_handler(self.error_handler)
     
     async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
@@ -85,7 +85,7 @@ class TelegramBotAnalyzer:
         )
     
     async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /help"""
+        """Обработчик команды /help""" ✔️
         self.log_activity(update.effective_user.id, 'command', '/help')
         self.message_stats['commands_used'] += 1
         
@@ -98,16 +98,16 @@ class TelegramBotAnalyzer:
         /analyze - Полный анализ активности
         
         **Функциональность:**
-        - Отслеживание активности пользователей
-        - Статистика сообщений
-        - Визуализация данных
-        - Анализ поведения пользователей
+        - Отслеживание активности пользователей ✔️
+        - Статистика сообщений ✔️
+        - Визуализация данных ✔️
+        - Анализ поведения пользователей ✔️
         """
         
         await update.message.reply_text(help_text)
     
     async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /stats"""
+        """Обработчик команды /stats""" ✔️
         self.log_activity(update.effective_user.id, 'command', '/stats')
         self.message_stats['commands_used'] += 1
         
@@ -115,18 +115,18 @@ class TelegramBotAnalyzer:
         await update.message.reply_text(stats_text)
     
     async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /analyze"""
+        """Обработчик команды /analyze""" ✔️
         self.log_activity(update.effective_user.id, 'command', '/analyze')
         self.message_stats['commands_used'] += 1
         
-        # Создаем визуализации
+        # Создаем визуализации ✔️
         await self.create_visualizations()
         
-        # Отправляем анализ
+        # Отправляем анализ ✔️
         analysis_text = self.get_detailed_analysis()
         await update.message.reply_text(analysis_text)
         
-        # Отправляем графики
+        # Отправляем графики ✔️
         with open('user_activity.png', 'rb') as photo:
             await update.message.reply_photo(photo, caption="📈 Активность пользователей")
         
@@ -134,7 +134,7 @@ class TelegramBotAnalyzer:
             await update.message.reply_photo(photo, caption="📊 Распределение сообщений")
     
     async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик текстовых сообщений"""
+        """Обработчик текстовых сообщений""" ✔️
         user_id = update.effective_user.id
         message_text = update.message.text
         
@@ -150,7 +150,7 @@ class TelegramBotAnalyzer:
         await update.message.reply_text(response)
     
     async def handle_button_click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик нажатий на inline-кнопки"""
+        """Обработчик нажатий на inline-кнопки""" ✔️
         query = update.callback_query
         await query.answer()
         
@@ -166,7 +166,7 @@ class TelegramBotAnalyzer:
             await self.analyze_command(update, context)
     
     def log_activity(self, user_id: int, action_type: str, details: str = ""):
-        """Логирование активности пользователя"""
+        """Логирование активности пользователя""" ✔️
         timestamp = datetime.datetime.now()
         self.user_activity[user_id].append({
             'timestamp': timestamp,
@@ -174,7 +174,7 @@ class TelegramBotAnalyzer:
             'details': details
         })
         
-        # Сохраняем в базу данных
+        # Сохраняем в базу данных ✔️
         cursor = self.conn.cursor()
         cursor.execute(
             "INSERT INTO user_activity (user_id, action_type, timestamp, details) VALUES (?, ?, ?, ?)",
@@ -183,11 +183,11 @@ class TelegramBotAnalyzer:
         self.conn.commit()
     
     def get_bot_stats(self) -> str:
-        """Получение статистики бота"""
+        """Получение статистики бота""" ✔️
         total_users = len(self.user_activity)
         today = datetime.date.today()
         
-        # Активность за сегодня
+        # Активность за сегодня ✔️
         today_activity = sum(1 for activities in self.user_activity.values()
                            for act in activities if act['timestamp'].date() == today)
         
@@ -205,16 +205,16 @@ class TelegramBotAnalyzer:
         return stats_text
     
     def get_detailed_analysis(self) -> str:
-        """Детальный анализ активности"""
+        """Детальный анализ активности""" 
         if not self.user_activity:
             return "📊 Данных для анализа пока недостаточно."
         
-        # Анализ самых активных пользователей
+        # Анализ самых активных пользователей ✔️
         user_activity_count = {user_id: len(activities) 
                              for user_id, activities in self.user_activity.items()}
         top_users = sorted(user_activity_count.items(), key=lambda x: x[1], reverse=True)[:5]
         
-        # Анализ по времени суток
+        # Анализ по времени суток ✔️
         hour_activity = defaultdict(int)
         for activities in self.user_activity.values():
             for act in activities:
@@ -234,7 +234,7 @@ class TelegramBotAnalyzer:
         if not self.user_activity:
             return
         
-        # График активности пользователей
+        # График активности пользователей ✔️
         user_activity_count = {user_id: len(activities) 
                              for user_id, activities in self.user_activity.items()}
         
@@ -261,18 +261,19 @@ class TelegramBotAnalyzer:
         plt.close()
     
     async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик ошибок"""
+        """Обработчик ошибок""" ✔️
         logger.error(f"Ошибка: {context.error}")
     
     def run(self):
-        """Запуск бота"""
+        """Запуск бота""" ✔️
         print("🤖 Бот-анализатор запущен...")
         self.application.run_polling()
 
-# Пример использования
+# Пример использования ✔️
 if __name__ == "__main__":
     # Замените 'YOUR_BOT_TOKEN' на реальный токен вашего бота
     BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
     
     analyzer_bot = TelegramBotAnalyzer(BOT_TOKEN)
     analyzer_bot.run()
+
