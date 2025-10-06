@@ -246,7 +246,7 @@ class TelegramBotAnalyzer:
         plt.savefig('user_activity.png')
         plt.close()
         
-        # Круговая диаграмма распределения типов сообщений
+        # Круговая диаграмма распределения типов сообщений ✔️
         labels = ['Команды', 'Текст', 'Callback']
         sizes = [
             self.message_stats['commands_used'],
@@ -276,4 +276,5 @@ if __name__ == "__main__":
     
     analyzer_bot = TelegramBotAnalyzer(BOT_TOKEN)
     analyzer_bot.run()
+
 
