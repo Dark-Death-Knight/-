@@ -1,280 +1,242 @@
-import asyncio
-import logging
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackQueryHandler, ContextTypes
-from collections import defaultdict
+import html
+import telebot
+from telebot import types
+import requests
+import json
 import datetime
-import sqlite3
-import matplotlib.pyplot as plt
-import pandas as pd
-from typing import Dict, List
 
-# Настройка логирования ✔️
-logging.basicConfig(
-    format='%(asctime)s - %(name)s - %(levelname)s - %(message)s',
-    level=logging.INFO
-)
-logger = logging.getLogger(__name__)
+bot = telebot.TeleBot('8038191080:AAEH1x4Jh1JQPKVjztrhGtOfw1btElAxlKA')
 
-class TelegramBotAnalyzer:
-    def __init__(self, token: str):
-        self.application = Application.builder().token(token).build()
-        self.user_activity = defaultdict(list)
-        self.message_stats = {
-            'total_messages': 0,
-            'commands_used': 0,
-            'text_messages': 0,
-            'callback_queries': 0
-        }
-        self.setup_handlers()
-        self.setup_database()
+# Хранилище для данных пользователей
+user_data = {}
+
+@bot.message_handler(commands=['start'])
+def start(message):
+    user_id = message.from_user.id
+    user_data[user_id] = {
+        'first_name': message.from_user.first_name,
+        'last_name': message.from_user.last_name,
+        'join_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        'message_count': 0
+    }
     
-    def setup_database(self):
-        """Инициализация базы данных для хранения аналитики""" ✔️
-        self.conn = sqlite3.connect('bot_analytics.db', check_same_thread=False)
-        cursor = self.conn.cursor()
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS user_activity (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER,
-                action_type TEXT,
-                timestamp DATETIME,
-                details TEXT
-            )
-        ''')
-        cursor.execute('''
-            CREATE TABLE IF NOT EXISTS message_stats (
-                date DATE PRIMARY KEY,
-                total_messages INTEGER,
-                unique_users INTEGER
-            )
-        ''')
-        self.conn.commit()
+    markup = types.ReplyKeyboardMarkup(resize_keyboard=True)
+    item1 = types.KeyboardButton('📊 Информация')
+    item2 = types.KeyboardButton('🆘 Помощь')
+    item3 = types.KeyboardButton('🌐 Сайт')
+    markup.add(item1, item2, item3)
     
-    def setup_handlers(self):
-        """Настройка обработчиков команд и сообщений""" ✔️
-        # Обработчики команд
-        self.application.add_handler(CommandHandler("start", self.start_command))
-        self.application.add_handler(CommandHandler("help", self.help_command))
-        self.application.add_handler(CommandHandler("stats", self.stats_command))
-        self.application.add_handler(CommandHandler("analyze", self.analyze_command))
-        
-        # Обработчики сообщений ✔️
-        self.application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, self.handle_text_message))
-        self.application.add_handler(CallbackQueryHandler(self.handle_button_click))
-        
-        # Обработчик ошибок ✔️
-        self.application.add_error_handler(self.error_handler)
+    welcome_text = f"""
+    👋 Привет, {message.from_user.first_name}!
+
+Я многофункциональный бот с различными возможностями:
+
+📝 /text - Форматирование текста
+📊 /stats - Статистика
+🕐 /time - Текущее время
+🌤 /weather - Погода
+🎲 /random - Случайное число
+
+Выберите команду или используйте кнопки ниже!
+    """
     
-    async def start_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /start"""
-        self.log_activity(update.effective_user.id, 'command', '/start')
-        self.message_stats['commands_used'] += 1
-        
-        keyboard = [
-            [InlineKeyboardButton("Помощь", callback_data="help")],
-            [InlineKeyboardButton("Статистика", callback_data="stats")],
-            [InlineKeyboardButton("Анализ", callback_data="analyze")]
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        
-        await update.message.reply_text(
-            "🤖 Добро пожаловать в бот-анализатор!\n\n"
-            "Я могу анализировать активность и показывать статистику.",
-            reply_markup=reply_markup
-        )
-    
-    async def help_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /help""" ✔️
-        self.log_activity(update.effective_user.id, 'command', '/help')
-        self.message_stats['commands_used'] += 1
-        
-        help_text = """
-        📊 **Доступные команды:**
-        
-        /start - Запустить бота
-        /help - Показать эту справку
-        /stats - Показать статистику бота
-        /analyze - Полный анализ активности
-        
-        **Функциональность:**
-        - Отслеживание активности пользователей ✔️
-        - Статистика сообщений ✔️
-        - Визуализация данных ✔️
-        - Анализ поведения пользователей ✔️
-        """
-        
-        await update.message.reply_text(help_text)
-    
-    async def stats_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /stats""" ✔️
-        self.log_activity(update.effective_user.id, 'command', '/stats')
-        self.message_stats['commands_used'] += 1
-        
-        stats_text = self.get_bot_stats()
-        await update.message.reply_text(stats_text)
-    
-    async def analyze_command(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик команды /analyze""" ✔️
-        self.log_activity(update.effective_user.id, 'command', '/analyze')
-        self.message_stats['commands_used'] += 1
-        
-        # Создаем визуализации ✔️
-        await self.create_visualizations()
-        
-        # Отправляем анализ ✔️
-        analysis_text = self.get_detailed_analysis()
-        await update.message.reply_text(analysis_text)
-        
-        # Отправляем графики ✔️
-        with open('user_activity.png', 'rb') as photo:
-            await update.message.reply_photo(photo, caption="📈 Активность пользователей")
-        
-        with open('message_distribution.png', 'rb') as photo:
-            await update.message.reply_photo(photo, caption="📊 Распределение сообщений")
-    
-    async def handle_text_message(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик текстовых сообщений""" ✔️
-        user_id = update.effective_user.id
-        message_text = update.message.text
-        
-        self.log_activity(user_id, 'text_message', message_text[:50])
-        self.message_stats['text_messages'] += 1
-        self.message_stats['total_messages'] += 1
-        
-        # Простой эхо-ответ с анализом
-        response = f"📝 Получено сообщение: {len(message_text)} символов\n"
-        response += f"👤 Пользователь: {user_id}\n"
-        response += f"📊 Всего сообщений: {self.message_stats['total_messages']}"
-        
-        await update.message.reply_text(response)
-    
-    async def handle_button_click(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик нажатий на inline-кнопки""" ✔️
-        query = update.callback_query
-        await query.answer()
-        
-        self.log_activity(update.effective_user.id, 'callback', query.data)
-        self.message_stats['callback_queries'] += 1
-        
-        if query.data == "help":
-            await self.help_command(update, context)
-        elif query.data == "stats":
-            await query.edit_message_text(self.get_bot_stats())
-        elif query.data == "analyze":
-            await query.edit_message_text("🔍 Запускаю анализ...")
-            await self.analyze_command(update, context)
-    
-    def log_activity(self, user_id: int, action_type: str, details: str = ""):
-        """Логирование активности пользователя""" ✔️
-        timestamp = datetime.datetime.now()
-        self.user_activity[user_id].append({
-            'timestamp': timestamp,
-            'action_type': action_type,
-            'details': details
-        })
-        
-        # Сохраняем в базу данных ✔️
-        cursor = self.conn.cursor()
-        cursor.execute(
-            "INSERT INTO user_activity (user_id, action_type, timestamp, details) VALUES (?, ?, ?, ?)",
-            (user_id, action_type, timestamp, details)
-        )
-        self.conn.commit()
-    
-    def get_bot_stats(self) -> str:
-        """Получение статистики бота""" ✔️
-        total_users = len(self.user_activity)
-        today = datetime.date.today()
-        
-        # Активность за сегодня ✔️
-        today_activity = sum(1 for activities in self.user_activity.values()
-                           for act in activities if act['timestamp'].date() == today)
-        
+    bot.send_message(message.chat.id, welcome_text, reply_markup=markup, parse_mode='HTML')
+
+@bot.message_handler(commands=['help'])
+def help_command(message):
+    help_text = """
+<b>📋 Доступные команды:</b>
+
+<code>/start</code> - Запуск бота
+<code>/help</code> - Справка по командам
+<code>/text</code> - HTML форматирование
+<code>/stats</code> - Ваша статистика
+<code>/time</code> - Текущее время
+<code>/weather</code> - Погода в Москве
+<code>/random</code> - Случайное число
+<code>/inline</code> - Inline клавиатура
+
+<em>Также можете просто написать сообщение - я его обработаю!</em>
+    """
+    bot.send_message(message.chat.id, help_text, parse_mode='HTML')
+
+@bot.message_handler(commands=['text'])
+def text_formatting(message):
+    formatting_examples = """
+<b>🖋 Примеры HTML форматирования:</b>
+
+<b>Жирный текст</b> - <code>&lt;b&gt;текст&lt;/b&gt;</code>
+<em>Курсив</em> - <code>&lt;em&gt;текст&lt;/em&gt;</code>
+<u>Подчеркнутый</u> - <code>&lt;u&gt;текст&lt;/u&gt;</code>
+<s>Зачеркнутый</s> - <code>&lt;s&gt;текст&lt;/s&gt;</code>
+<code>Моноширинный</code> - <code>&lt;code&gt;текст&lt;/code&gt;</code>
+<a href="https://telegram.org">Ссылка</a> - <code>&lt;a href="URL"&gt;текст&lt;/a&gt;</code>
+    """
+    bot.send_message(message.chat.id, formatting_examples, parse_mode='HTML')
+
+@bot.message_handler(commands=['stats'])
+def stats(message):
+    user_id = message.from_user.id
+    if user_id in user_data:
+        user_info = user_data[user_id]
         stats_text = f"""
-        📊 **Статистика бота**
-        
-        👥 Всего пользователей: {total_users}
-        📨 Всего сообщений: {self.message_stats['total_messages']}
-        ⚡ Команд использовано: {self.message_stats['commands_used']}
-        💬 Текстовых сообщений: {self.message_stats['text_messages']}
-        🔘 Нажатий кнопок: {self.message_stats['callback_queries']}
-        📈 Активность сегодня: {today_activity} действий
+<b>📊 Ваша статистика:</b>
+
+👤 Имя: {user_info['first_name']}
+📅 Дата регистрации: {user_info['join_date']}
+📨 Сообщений отправлено: {user_info['message_count']}
+🆔 Ваш ID: <code>{user_id}</code>
         """
-        
-        return stats_text
+    else:
+        stats_text = "❌ Данные не найдены. Используйте /start"
     
-    def get_detailed_analysis(self) -> str:
-        """Детальный анализ активности""" 
-        if not self.user_activity:
-            return "📊 Данных для анализа пока недостаточно."
-        
-        # Анализ самых активных пользователей ✔️
-        user_activity_count = {user_id: len(activities) 
-                             for user_id, activities in self.user_activity.items()}
-        top_users = sorted(user_activity_count.items(), key=lambda x: x[1], reverse=True)[:5]
-        
-        # Анализ по времени суток ✔️
-        hour_activity = defaultdict(int)
-        for activities in self.user_activity.values():
-            for act in activities:
-                hour_activity[act['timestamp'].hour] += 1
-        
-        analysis_text = "🔍 **Детальный анализ активности**\n\n"
-        analysis_text += "🏆 **Топ-5 активных пользователей:**\n"
-        for i, (user_id, count) in enumerate(top_users, 1):
-            analysis_text += f"{i}. ID {user_id}: {count} действий\n"
-        
-        analysis_text += f"\n🕒 **Пиковая активность:** {max(hour_activity, key=hour_activity.get)}:00"
-        
-        return analysis_text
-    
-    async def create_visualizations(self):
-        """Создание визуализаций активности"""
-        if not self.user_activity:
-            return
-        
-        # График активности пользователей ✔️
-        user_activity_count = {user_id: len(activities) 
-                             for user_id, activities in self.user_activity.items()}
-        
-        plt.figure(figsize=(10, 6))
-        plt.bar(range(len(user_activity_count)), list(user_activity_count.values()))
-        plt.title('Активность пользователей')
-        plt.xlabel('Пользователи')
-        plt.ylabel('Количество действий')
-        plt.savefig('user_activity.png')
-        plt.close()
-        
-        # Круговая диаграмма распределения типов сообщений ✔️
-        labels = ['Команды', 'Текст', 'Callback']
-        sizes = [
-            self.message_stats['commands_used'],
-            self.message_stats['text_messages'], 
-            self.message_stats['callback_queries']
-        ]
-        
-        plt.figure(figsize=(8, 8))
-        plt.pie(sizes, labels=labels, autopct='%1.1f%%', startangle=90)
-        plt.title('Распределение типов сообщений')
-        plt.savefig('message_distribution.png')
-        plt.close()
-    
-    async def error_handler(self, update: Update, context: ContextTypes.DEFAULT_TYPE):
-        """Обработчик ошибок""" ✔️
-        logger.error(f"Ошибка: {context.error}")
-    
-    def run(self):
-        """Запуск бота""" ✔️
-        print("🤖 Бот-анализатор запущен...")
-        self.application.run_polling()
+    bot.send_message(message.chat.id, stats_text, parse_mode='HTML')
 
-# Пример использования ✔️
+@bot.message_handler(commands=['time'])
+def current_time(message):
+    current_time = datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+    time_text = f"""
+<b>🕐 Текущее время:</b>
+
+📅 Дата: <code>{datetime.datetime.now().strftime('%d.%m.%Y')}</code>
+⏰ Время: <code>{datetime.datetime.now().strftime('%H:%M:%S')}</code>
+🌍 Часовой пояс: МСК (UTC+3)
+    """
+    bot.send_message(message.chat.id, time_text, parse_mode='HTML')
+
+@bot.message_handler(commands=['weather'])
+def weather(message):
+    try:
+        # Пример API запроса (замените на реальный API ключ)
+        # response = requests.get(f"http://api.openweathermap.org/data/2.5/weather?q=Moscow&appid=YOUR_API_KEY")
+        # weather_data = response.json()
+        
+        # Заглушка для демонстрации
+        weather_text = """
+<b>🌤 Погода в Москве:</b>
+
+🌡 Температура: +5°C
+💨 Ветер: 3 м/с
+💧 Влажность: 75%
+☁️ Облачность: переменная
+📋 Описание: Легкая облачность
+
+<em>Обновлено: сейчас</em>
+        """
+        bot.send_message(message.chat.id, weather_text, parse_mode='HTML')
+    except Exception as e:
+        bot.send_message(message.chat.id, "❌ Ошибка получения погоды")
+
+@bot.message_handler(commands=['random'])
+def random_number(message):
+    import random
+    number = random.randint(1, 100)
+    random_text = f"""
+<b>🎲 Случайное число:</b>
+
+Ваше число: <code>{number}</code>
+Диапазон: 1-100
+
+<em>Хотите еще? Используйте команду снова!</em>
+    """
+    bot.send_message(message.chat.id, random_text, parse_mode='HTML')
+
+@bot.message_handler(commands=['inline'])
+def inline_keyboard(message):
+    markup = types.InlineKeyboardMarkup()
+    btn1 = types.InlineKeyboardButton('📊 Статистика', callback_data='stats')
+    btn2 = types.InlineKeyboardButton('🕐 Время', callback_data='time')
+    btn3 = types.InlineKeyboardButton('🎲 Случайное число', callback_data='random')
+    btn4 = types.InlineKeyboardButton('🌐 Сайт', url='https://telegram.org')
+    markup.add(btn1, btn2)
+    markup.add(btn3, btn4)
+    
+    bot.send_message(message.chat.id, "🔘 Выберите действие:", reply_markup=markup)
+
+@bot.callback_query_handler(func=lambda call: True)
+def callback_handler(call):
+    if call.data == 'stats':
+        user_id = call.from_user.id
+        if user_id in user_data:
+            count = user_data[user_id]['message_count']
+            bot.answer_callback_query(call.id, f"Вы отправили {count} сообщений")
+        else:
+            bot.answer_callback_query(call.id, "Данные не найдены")
+    
+    elif call.data == 'time':
+        current_time = datetime.datetime.now().strftime("%H:%M:%S")
+        bot.answer_callback_query(call.id, f"Текущее время: {current_time}")
+    
+    elif call.data == 'random':
+        import random
+        number = random.randint(1, 100)
+        bot.answer_callback_query(call.id, f"Случайное число: {number}")
+
+# Обработчик текстовых сообщений
+@bot.message_handler(content_types=['text'])
+def handle_text(message):
+    user_id = message.from_user.id
+    
+    # Обновляем счетчик сообщений
+    if user_id in user_data:
+        user_data[user_id]['message_count'] += 1
+    else:
+        user_data[user_id] = {
+            'first_name': message.from_user.first_name,
+            'last_name': message.from_user.last_name,
+            'join_date': datetime.datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+            'message_count': 1
+        }
+    
+    # Обработка текста из кнопок
+    if message.text == '📊 Информация':
+        info_text = """
+<b>ℹ️ Информация о боте:</b>
+
+Это демонстрационный Telegram бот
+с различными функциями и командами.
+
+Разработан на Python с использованием
+библиотеки pyTelegramBotAPI.
+
+🔧 Функции:
+• HTML форматирование
+• Статистика пользователей
+• Inline клавиатуры
+• Обработка callback'ов
+        """
+        bot.send_message(message.chat.id, info_text, parse_mode='HTML')
+    
+    elif message.text == '🆘 Помощь':
+        help_command(message)
+    
+    elif message.text == '🌐 Сайт':
+        markup = types.InlineKeyboardMarkup()
+        btn = types.InlineKeyboardButton('Перейти на сайт Telegram', url='https://telegram.org')
+        markup.add(btn)
+        bot.send_message(message.chat.id, "Нажмите кнопку для перехода:", reply_markup=markup)
+    
+    else:
+        # Эхо-ответ с обработкой HTML
+        response = f"""
+<b>📨 Получено сообщение:</b>
+
+<code>{html.escape(message.text)}</code>
+
+📊 Длина: {len(message.text)} символов
+👤 От: {message.from_user.first_name}
+        """
+        bot.send_message(message.chat.id, response, parse_mode='HTML')
+
+# Обработчик других типов контента
+@bot.message_handler(content_types=['photo', 'document', 'sticker'])
+def handle_media(message):
+    bot.send_message(message.chat.id, f"📎 Получен медиа-файл! Тип: {message.content_type}")
+
+# Запуск бота
 if __name__ == "__main__":
-    # Замените 'YOUR_BOT_TOKEN' на реальный токен вашего бота
-    BOT_TOKEN = "YOUR_BOT_TOKEN_HERE"
-    
-    analyzer_bot = TelegramBotAnalyzer(BOT_TOKEN)
-    analyzer_bot.run()
-
-
+    print("Бот запущен...")
+    try:
+        bot.polling(none_stop=True)
+    except Exception as e:
+        print(f"Ошибка: {e}")
